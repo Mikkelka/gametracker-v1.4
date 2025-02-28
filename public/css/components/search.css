@@ -7,12 +7,13 @@
 }
 
 #searchInput {
-  padding: 8px 30px 8px 10px;
-  border-radius: 20px;
-  border: 1px solid #ccc;
-  width: 200px;
-  background-color: var(--surface-color);
-  color: var(--text-color);
+  width: 100%;
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background-color: #222;
+  color: white;
+  font-size: 0.9rem;
 }
 
 #searchInput:focus {
@@ -51,20 +52,16 @@
   font-size: 20px;
   cursor: pointer;
   padding: 5px;
-  margin-left: 10px;
 }
 
 /* Mobile styling */
 @media (max-width: 768px) {
-  /* Vis søge-toggle-knappen på mobil */
   .search-toggle-btn {
     display: block;
-    /* position: absolute; */
-    right: 70px; /* Justér efter behov */
+    right: 70px;
     top: 15px;
   }
-  
-  /* Omorganiser header på mobil */
+
   header {
     flex-wrap: wrap;
     padding: 10px;
@@ -72,18 +69,15 @@
   
   h1 {
     font-size: 1.2rem;
-    /* margin-right: 40px; Gør plads til søge-knappen */
   }
   
-  /* Standard: skjul søgecontainer på mobil */
   .search-container {
     display: none;
     width: 100%;
-    margin: 10px 0;
+    margin: 10px 0 0;
     order: 3;
   }
   
-  /* Når søgefeltet er aktivt på mobil */
   .search-container.active {
     display: flex;
   }
@@ -99,3 +93,4 @@
     justify-content: space-between;
   }
 }
+

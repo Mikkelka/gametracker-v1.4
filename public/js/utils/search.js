@@ -119,13 +119,6 @@ export function initSearch(app) {
       if (visibleCards === 0 && searchTerm) {
         const noGamesMsg = document.createElement('p');
         noGamesMsg.className = 'empty-list-message';
-
-        if (isFavoriteSearch) {
-          noGamesMsg.textContent = 'Ingen favorit-spil matcher søgningen';
-        } else {
-          noGamesMsg.textContent = 'Ingen spil matcher søgningen';
-        }
-
         list.appendChild(noGamesMsg);
       }
     });

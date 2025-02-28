@@ -220,6 +220,16 @@ h1 {
     right: 20px !important;
     top: 40.2031px !important;
   }
+
+
+  #addGameBtn,
+  #platformBtn,
+  #exportBtn,
+  #importBtn {
+    padding: 8px 5px;
+  }
+
+
 }
 
 .version {

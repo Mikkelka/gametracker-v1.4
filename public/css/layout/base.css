@@ -1,0 +1,25 @@
+/* base.css */
+:root {
+  --bg-color: #1a1a1a;
+  --text-color: #e0e0e0;
+  --header-bg: #2c2c2c;
+  --list-bg: #2c2c2c;
+  --card-bg: #3a3a3a;
+  --card-border: #4a4a4a;
+  --button-bg: #4caf50;
+  --button-hover: #45a049;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  box-sizing: border-box;
+}

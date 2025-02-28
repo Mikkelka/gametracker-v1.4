@@ -1,0 +1,101 @@
+/* search.css */
+.search-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  margin: 0 20px;
+}
+
+#searchInput {
+  padding: 8px 30px 8px 10px;
+  border-radius: 20px;
+  border: 1px solid #ccc;
+  width: 200px;
+  background-color: var(--surface-color);
+  color: var(--text-color);
+}
+
+#searchInput:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-search-btn:hover {
+  color: var(--text-color);
+}
+
+/* Skjul søge-toggle-knappen som standard på desktop */
+.search-toggle-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 5px;
+  margin-left: 10px;
+}
+
+/* Mobile styling */
+@media (max-width: 768px) {
+  /* Vis søge-toggle-knappen på mobil */
+  .search-toggle-btn {
+    display: block;
+    /* position: absolute; */
+    right: 70px; /* Justér efter behov */
+    top: 15px;
+  }
+  
+  /* Omorganiser header på mobil */
+  header {
+    flex-wrap: wrap;
+    padding: 10px;
+  }
+  
+  h1 {
+    font-size: 1.2rem;
+    /* margin-right: 40px; Gør plads til søge-knappen */
+  }
+  
+  /* Standard: skjul søgecontainer på mobil */
+  .search-container {
+    display: none;
+    width: 100%;
+    margin: 10px 0;
+    order: 3;
+  }
+  
+  /* Når søgefeltet er aktivt på mobil */
+  .search-container.active {
+    display: flex;
+  }
+  
+  #searchInput {
+    width: 100%;
+  }
+  
+  /* Gør header-knapper mere kompakte på mobil */
+  .header-buttons {
+    width: 100%;
+    margin-top: 10px;
+    justify-content: space-between;
+  }
+}

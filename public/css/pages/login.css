@@ -1,0 +1,48 @@
+/* login.css */
+.login-container {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 20px;
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 240px;
+  margin: 20px auto 0;
+  padding: 10px 12px;
+  background-color: white;
+  color: #757575;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: "Roboto", sans-serif;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.login-button:hover {
+  background-color: #f1f1f1;
+}
+
+.google-icon-wrapper {
+  width: 18px;
+  height: 18px;
+  margin-right: 24px;
+}
+
+.google-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.login-button-text {
+  padding-right: 24px;
+}

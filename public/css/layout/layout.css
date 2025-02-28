@@ -1,0 +1,87 @@
+/* layout.css */
+header {
+  background-color: var(--header-bg);
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  transition: background-color 0.3s ease;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+#app {
+  padding: 2rem;
+  padding-top: 1rem;
+  min-height: calc(100vh - 60px - 3rem);
+}
+
+#listsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+.list {
+  background-color: var(--list-bg);
+  border-radius: 8px;
+  padding: 1rem;
+  width: 280px;
+  box-shadow: var(--shadow);
+}
+
+/* Ensure these styles are applied only on desktop */
+@media (min-width: 769px) {
+  #listsContainer {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .list {
+    flex: 0 0 auto;
+    width: 280px;
+  }
+}
+
+/* Footer styles */
+footer {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: var(--header-bg);
+  color: var(--text-color);
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+footer p {
+  margin: 0;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  #app {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding: 1rem 0;
+    gap: 1rem;
+  }
+
+  .list {
+    flex: 0 0 auto;
+    width: calc(100% - 2rem);
+    margin: 0 1rem;
+    scroll-snap-align: center;
+  }
+}
+

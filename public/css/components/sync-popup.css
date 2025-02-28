@@ -1,0 +1,28 @@
+/* sync-popup.css */
+.sync-popup {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #4caf50;
+  color: white;
+  padding: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  z-index: 1000;
+}
+
+.sync-popup.show {
+  opacity: 1;
+}
+
+.sync-icon {
+  margin-right: 8px;
+  font-size: 18px;
+}
+
+.sync-text {
+  font-size: 14px;
+}

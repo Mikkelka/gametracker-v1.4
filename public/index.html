@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="da">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#your-theme-color" />
+    <meta name="description" content="Your app description" />
+    <title>GameTrack</title>
+    <!-- Updated CSS file paths -->
+    <link rel="stylesheet" href="./css/layout/base.css" />
+    <link rel="stylesheet" href="./css/layout/layout.css" />
+    <link rel="stylesheet" href="./css/components/components.css" />
+    <link rel="stylesheet" href="./css/components/modal.css" />
+    <link rel="stylesheet" href="./css/layout/responsive.css" />
+    <link rel="stylesheet" href="./css/utilities/animations.css" />
+    <link rel="stylesheet" href="./css/components/add-game-modal.css" />
+    <link rel="stylesheet" href="./css/components/platform-modal.css" />
+    <link rel="stylesheet" href="./css/components/sync-popup.css" />
+    <link rel="stylesheet" href="./css/components/dropdown-menu.css" />
+    <link rel="stylesheet" href="./css/components/search.css" />
+
+    <!-- web app -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  </head>
+  <body>
+    <!-- Opdatér header-sektionen i index.html -->
+    <header>
+      <h1>
+        <span class="logo-container">
+          GameTrack <span class="version">v1.14</span>
+        </span>
+
+        <span class="header-separator">|</span>
+
+        <!-- Tilføj søge-toggle-knap på mobilvisning -->
+        <button id="searchToggleBtn" class="search-toggle-btn" aria-label="Vis søgning">🔍</button>
+
+        <span class="user-name-container">
+          <span id="userNameDisplay"></span>
+          <button id="editNameBtn" class="edit-name-btn" title="Rediger navn">
+            ✏️
+          </button>
+        </span>
+      </h1>
+      
+      
+      <!-- Søgebaren, som vil være skjult på mobil som standard -->
+      <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Søg efter spil eller 'favorit'..." aria-label="Søg efter spil">
+        <button id="clearSearchBtn" class="clear-search-btn" aria-label="Ryd søgning">✕</button>
+      </div>
+      
+      <div class="header-buttons">
+        <button id="platformBtn">Platforme</button>
+        <button id="addGameBtn">Tilføj Spil</button>
+        <div class="dropdown">
+          <button id="dropdownBtn" class="dropbtn">Mere ▼</button>
+          <div id="dropdownContent" class="dropdown-content">
+            <button id="exportBtn" class="dropdown-btn">Eksportér</button>
+            <button id="importBtn" class="dropdown-btn">Importér</button>
+            <button id="settingsBtn" class="dropdown-btn">Indstillinger</button>
+            <button id="logoutBtn" class="dropdown-btn">Log ud</button>
+          </div>
+        </div>
+        <input
+          type="file"
+          id="importFile"
+          accept=".json"
+          style="display: none"
+        />
+      </div>
+    </header>
+
+    <div id="app">
+      <div id="listIndicator"></div>
+      <div id="listsContainer"></div>
+    </div>
+
+    <div id="addGameModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Tilføj nyt spil</h2>
+        <form id="addGameForm" class="game-form">
+          <div class="form-group">
+            <label for="gameTitle">Spiltitel:</label>
+            <input type="text" id="gameTitle" required />
+          </div>
+          <div class="form-group">
+            <label for="gamePlatform">Platform:</label>
+            <select id="gamePlatform" required></select>
+          </div>
+          <button type="submit" class="btn btn-primary">Tilføj Spil</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="platformModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Administrer Platforme</h2>
+        <form id="addPlatformForm" class="platform-form">
+          <div class="form-group">
+            <label for="platformName">Platformnavn:</label>
+            <input type="text" id="platformName" required />
+          </div>
+          <div class="form-group color-picker">
+            <label for="platformColor">Farve:</label>
+            <input type="color" id="platformColor" required />
+            <div class="color-preview"></div>
+          </div>
+          <button type="submit" class="btn btn-primary">Tilføj Platform</button>
+        </form>
+        <ul id="platformList" class="platform-list"></ul>
+      </div>
+    </div>
+
+    <div id="editNameModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Rediger dit navn</h2>
+        <form id="editNameForm">
+          <div class="form-group">
+            <label for="newName">Nyt navn:</label>
+            <input type="text" id="newName" required />
+          </div>
+          <button type="submit" class="btn btn-primary">Gem</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="settingsModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Indstillinger</h2>
+        <form id="settingsForm">
+          <div class="form-group">
+            <label>
+              Vis "Ser frem til" liste
+              <span class="toggle-switch">
+                <input type="checkbox" id="showUpcoming" name="showUpcoming" />
+                <span class="slider"></span>
+              </span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>
+              Vis "På pause" liste
+              <span class="toggle-switch">
+                <input type="checkbox" id="showPaused" name="showPaused" />
+                <span class="slider"></span>
+              </span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>
+              Vis "Droppet" liste
+              <span class="toggle-switch">
+                <input type="checkbox" id="showDropped" name="showDropped" />
+                <span class="slider"></span>
+              </span>
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            Gem indstillinger
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div id="syncPopup" class="sync-popup">
+      <span class="sync-icon">✓</span>
+      <span class="sync-text">Synkroniseret</span>
+    </div>
+
+    <footer>
+      <p>&copy; 2024 GameTrack. Alle rettigheder forbeholdes.</p>
+    </footer>
+
+    <!-- Updated JS file paths -->
+    <script type="module" src="./js/app.js"></script>
+    <script type="module" src="./js/services/firebase-config.js"></script>
+    <script type="module" src="./js/services/storage.js"></script>
+    <script type="module" src="./js/components/ui.js"></script>
+    <script type="module" src="./js/utils/dragAndDrop.js"></script>
+    <script type="module" src="./js/services/userManagement.js"></script>
+    <script type="module" src="./js/components/settings.js"></script>
+
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/service-worker.js")
+            .then((registration) => {})
+            .catch((err) => {
+              console.log("ServiceWorker registration failed: ", err);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>

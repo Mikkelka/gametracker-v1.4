@@ -2,88 +2,277 @@
 import { Platforms } from "./platforms.js";
 import { Settings } from "./settings.js";
 
+// Cache af seneste renderede spil, grupperet efter liste
+let previousGamesState = {
+  upcoming: [],
+  willplay: [],
+  playing: [],
+  completed: [],
+  paused: [],
+  dropped: []
+};
+
+// Cache af DOM-referencer
+const domCache = {
+  lists: {}
+};
+
 export function render(games, lists) {
   const app = document.getElementById("app");
   const listIndicator = document.getElementById("listIndicator");
   const listsContainer = document.getElementById("listsContainer");
-
-  listIndicator.innerHTML = "";
-  listsContainer.innerHTML = "";
-
-  // Create indicator dots only for visible lists
-  lists.forEach((list, index) => {
-    if (
-      (list.id === "upcoming" && !Settings.showUpcoming) ||
-      (list.id === "paused" && !Settings.showPaused) ||
-      (list.id === "dropped" && !Settings.showDropped)
-    ) {
-      return; // Skip this list
-    }
-    const dot = document.createElement("div");
-    dot.className = "indicator-dot";
-    if (index === 0) dot.classList.add("active");
-    listIndicator.appendChild(dot);
-  });
-
+  
+  // Opdater indikator-dots først
+  updateListIndicator(listIndicator, lists);
+  
+  // Initialiser DOM cache for lister, hvis det er første render
+  if (Object.keys(domCache.lists).length === 0) {
+    initializeDomCache(listsContainer);
+  }
+  
+  // Gruppér spil efter status for lettere sammenligning
+  const currentGamesByStatus = groupGamesByStatus(games);
+  
+  // Render hver liste, men kun hvis der er ændringer
   lists.forEach(({ id, name }) => {
+    // Tjek om listen skal vises baseret på indstillinger
     if (
       (id === "upcoming" && !Settings.showUpcoming) ||
       (id === "paused" && !Settings.showPaused) ||
       (id === "dropped" && !Settings.showDropped)
     ) {
-      return; // Skip rendering this list
+      // Skjul listen hvis den er synlig, men skal skjules
+      if (domCache.lists[id] && domCache.lists[id].element.parentNode) {
+        listsContainer.removeChild(domCache.lists[id].element);
+      }
+      return;
     }
+    
+    const currentGamesInList = currentGamesByStatus[id] || [];
+    const previousGamesInList = previousGamesState[id] || [];
+    
+    // Tjek om der er ændringer i listen
+    if (hasListChanged(currentGamesInList, previousGamesInList)) {
+      updateList(id, name, currentGamesInList, listsContainer);
+      // Opdater cache for denne liste
+      previousGamesState[id] = JSON.parse(JSON.stringify(currentGamesInList));
+    }
+  });
+  
+  // Tilføj scroll event listener til at opdatere indikator
+  if (!listsContainer.hasScrollListener) {
+    listsContainer.addEventListener("scroll", updateIndicator);
+    listsContainer.hasScrollListener = true;
+  }
+  
+  // Opdater søgning hvis søgeværktøjet er initialiseret
+  if (window.searchUtils && typeof window.searchUtils.updateSearch === 'function') {
+    window.searchUtils.updateSearch();
+  }
+}
 
-    const listElement = document.createElement("div");
-    listElement.className = "list";
-    listElement.id = id;
-    listElement.innerHTML = `<h2>${name}</h2>`;
+function updateListIndicator(listIndicator, lists) {
+  // Kun opdater indikator, hvis antal lister har ændret sig
+  const visibleLists = lists.filter(list => 
+    !(list.id === "upcoming" && !Settings.showUpcoming) &&
+    !(list.id === "paused" && !Settings.showPaused) &&
+    !(list.id === "dropped" && !Settings.showDropped)
+  );
+  
+  if (listIndicator.children.length !== visibleLists.length) {
+    listIndicator.innerHTML = "";
+    visibleLists.forEach((_, index) => {
+      const dot = document.createElement("div");
+      dot.className = "indicator-dot";
+      if (index === 0) dot.classList.add("active");
+      listIndicator.appendChild(dot);
+    });
+  }
+}
 
-    const listGames = games.filter((game) => game.status === id);
+function initializeDomCache(listsContainer) {
+  // Opret DOM-cache for senere opdateringer
+  Array.from(listsContainer.children).forEach(list => {
+    const id = list.id;
+    domCache.lists[id] = {
+      element: list,
+      cards: {}
+    };
+    
+    // Cache kort i denne liste
+    Array.from(list.querySelectorAll('.card')).forEach(card => {
+      const gameId = card.dataset.id;
+      domCache.lists[id].cards[gameId] = card;
+    });
+  });
+}
 
-    // Sort games only by order, ensuring it's always a number
-    listGames.sort((a, b) => {
+function groupGamesByStatus(games) {
+  // Gruppér spil efter status og sortér efter rækkefølge
+  const grouped = {};
+  games.forEach(game => {
+    if (!grouped[game.status]) {
+      grouped[game.status] = [];
+    }
+    grouped[game.status].push(game);
+  });
+  
+  // Sortér hver gruppe efter rækkefølge
+  Object.keys(grouped).forEach(status => {
+    grouped[status].sort((a, b) => {
       const orderA = Number(a.order) || 0;
       const orderB = Number(b.order) || 0;
       return orderA - orderB;
     });
-
-    if (listGames.length === 0) {
-      const emptyMessage = document.createElement("p");
-      emptyMessage.className = "empty-list-message";
-      // emptyMessage.textContent = "Ingen spil i denne liste";
-      listElement.appendChild(emptyMessage);
-    } else {
-      listGames.forEach((game) => {
-        listElement.appendChild(createGameCard(game));
-      });
-    }
-
-    listsContainer.appendChild(listElement);
   });
-
-  // Add scroll event listener to update indicator
-  listsContainer.addEventListener("scroll", updateIndicator);
-
-  if (window.searchUtils && typeof window.searchUtils.updateSearch === 'function') {
-    window.searchUtils.updateSearch();
-  }
-
+  
+  return grouped;
 }
 
-function updateIndicator() {
-  const listsContainer = document.getElementById("listsContainer");
-  const indicators = document.querySelectorAll(".indicator-dot");
-  const lists = document.querySelectorAll(".list");
+function hasListChanged(currentGames, previousGames) {
+  // Sammenlign antal spil
+  if (currentGames.length !== previousGames.length) {
+    return true;
+  }
+  
+  // Sammenlign spil IDs og rækkefølge
+  for (let i = 0; i < currentGames.length; i++) {
+    const current = currentGames[i];
+    const previous = previousGames[i];
+    
+    if (current.id !== previous.id || 
+        current.order !== previous.order || 
+        current.favorite !== previous.favorite ||
+        current.platform !== previous.platform ||
+        current.platformColor !== previous.platformColor ||
+        current.completionDate !== previous.completionDate) {
+      return true;
+    }
+  }
+  
+  return false;
+}
 
-  const scrollPosition = listsContainer.scrollLeft;
-  const containerWidth = listsContainer.offsetWidth;
-
-  const activeIndex = Math.round(scrollPosition / containerWidth);
-
-  indicators.forEach((indicator, index) => {
-    indicator.classList.toggle("active", index === activeIndex);
+function updateList(listId, listName, games, listsContainer) {
+  let listElement;
+  
+  // Tjek om listen allerede eksisterer i DOM
+  if (domCache.lists[listId] && domCache.lists[listId].element) {
+    // Listen eksisterer, opdater indhold
+    listElement = domCache.lists[listId].element;
+    
+    // Behold overskriften, men fjern resten
+    const header = listElement.querySelector('h2');
+    listElement.innerHTML = '';
+    listElement.appendChild(header);
+  } else {
+    // Listen eksisterer ikke, opret den
+    listElement = document.createElement("div");
+    listElement.className = "list";
+    listElement.id = listId;
+    listElement.innerHTML = `<h2>${listName}</h2>`;
+    
+    // Opdater cache
+    domCache.lists[listId] = {
+      element: listElement,
+      cards: {}
+    };
+    
+    // Tilføj til DOM
+    listsContainer.appendChild(listElement);
+  }
+  
+  // Håndter tom liste
+  if (games.length === 0) {
+    const emptyMessage = document.createElement("p");
+    emptyMessage.className = "empty-list-message";
+    listElement.appendChild(emptyMessage);
+    // Ryd kort-cache for denne liste
+    domCache.lists[listId].cards = {};
+    return;
+  }
+  
+  // Brug et dokumentfragment til at reducere reflows
+  const fragment = document.createDocumentFragment();
+  
+  // Tilføj kort til dokumentfragmentet
+  games.forEach(game => {
+    let cardElement;
+    
+    // Tjek om kortet allerede eksisterer i cachen
+    if (domCache.lists[listId].cards[game.id]) {
+      // Kortet eksisterer, opdater det hvis nødvendigt
+      cardElement = domCache.lists[listId].cards[game.id];
+      updateCardContent(cardElement, game);
+    } else {
+      // Kortet eksisterer ikke, opret det
+      cardElement = createGameCard(game);
+      domCache.lists[listId].cards[game.id] = cardElement;
+    }
+    
+    fragment.appendChild(cardElement);
   });
+  
+  // Tilføj alle kort til listen
+  listElement.appendChild(fragment);
+  
+  // Opdater cache
+  const currentCardIds = games.map(game => game.id);
+  const cachedCardIds = Object.keys(domCache.lists[listId].cards);
+  
+  // Fjern kort fra cachen, der ikke længere er i listen
+  cachedCardIds.forEach(cardId => {
+    if (!currentCardIds.includes(cardId)) {
+      delete domCache.lists[listId].cards[cardId];
+    }
+  });
+}
+
+function updateCardContent(cardElement, game) {
+  // Opdater kun de felter, der kan være ændret
+  
+  // Opdater favorit-status
+  if (game.favorite) {
+    cardElement.classList.add("favorite");
+  } else {
+    cardElement.classList.remove("favorite");
+  }
+  
+  // Opdater title (sjældent ændret, men muligt)
+  const titleElement = cardElement.querySelector('h3');
+  if (titleElement.textContent !== game.title) {
+    titleElement.textContent = game.title;
+  }
+  
+  // Opdater platform
+  const platformPill = cardElement.querySelector('.platform-pill');
+  if (platformPill.textContent !== game.platform || 
+      platformPill.style.backgroundColor !== game.platformColor) {
+    platformPill.textContent = game.platform;
+    platformPill.style.backgroundColor = game.platformColor;
+    platformPill.dataset.platformName = game.platform;
+  }
+  
+  // Opdater completion date
+  const existingDateElement = cardElement.querySelector('.completion-date');
+  if (game.completionDate) {
+    if (existingDateElement) {
+      if (existingDateElement.textContent !== game.completionDate) {
+        existingDateElement.textContent = game.completionDate;
+      }
+    } else {
+      const dateElement = document.createElement('span');
+      dateElement.className = 'completion-date';
+      dateElement.textContent = game.completionDate;
+      cardElement.querySelector('.card-details').appendChild(dateElement);
+    }
+  } else if (existingDateElement) {
+    // Fjern datoen hvis den ikke længere findes
+    existingDateElement.remove();
+  }
+  
+  // Opdater data-attributter
+  cardElement.dataset.order = Number(game.order) || 0;
 }
 
 function createGameCard(game) {
@@ -116,6 +305,23 @@ function createGameCard(game) {
   cardElement.dataset.id = game.id;
   cardElement.dataset.order = Number(game.order) || 0;
   return cardElement;
+}
+
+// Opdateret indikator funktion
+function updateIndicator() {
+  const listsContainer = document.getElementById("listsContainer");
+  const indicators = document.querySelectorAll(".indicator-dot");
+  
+  if (!indicators.length) return;
+  
+  const scrollPosition = listsContainer.scrollLeft;
+  const containerWidth = listsContainer.offsetWidth;
+  
+  const activeIndex = Math.round(scrollPosition / containerWidth);
+  
+  indicators.forEach((indicator, index) => {
+    indicator.classList.toggle("active", index === activeIndex);
+  });
 }
 
 export function showEditMenu(gameId, x, y, app) {

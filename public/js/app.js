@@ -81,9 +81,9 @@ const App = {
         !(list.id === "paused" && !Settings.showPaused) &&
         !(list.id === "dropped" && !Settings.showDropped)
     );
-    render(this.games, visibleLists);
+    render(this.games, visibleLists, this); // Send app-objektet med til render
   },
-
+  
   handleRealTimeUpdate(updatedGames) {
     this.games = updatedGames;
     this.renderGames();

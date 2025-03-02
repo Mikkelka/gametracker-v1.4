@@ -17,10 +17,26 @@ const domCache = {
   lists: {}
 };
 
-export function render(games, lists) {
-  const app = document.getElementById("app");
+// Gemmer reference til app-objektet for global adgang
+let appInstance = null;
+
+// Globale event listeners til delegering
+let globalEventListenersInitialized = false;
+
+export function render(games, lists, app) {
+  // Gem app-reference globalt i denne modul
+  if (app && !appInstance) {
+    appInstance = app;
+  }
+  
   const listIndicator = document.getElementById("listIndicator");
   const listsContainer = document.getElementById("listsContainer");
+  
+  // Initialiser globale event listeners, hvis det er første render
+  if (!globalEventListenersInitialized && appInstance) {
+    initGlobalEventListeners();
+    globalEventListenersInitialized = true;
+  }
   
   // Opdater indikator-dots først
   updateListIndicator(listIndicator, lists);
@@ -69,6 +85,105 @@ export function render(games, lists) {
   if (window.searchUtils && typeof window.searchUtils.updateSearch === 'function') {
     window.searchUtils.updateSearch();
   }
+}
+
+// Initialiser globale event listeners for delegering
+function initGlobalEventListeners() {
+  // Event delegation for edit-menu knapper
+  document.body.addEventListener('click', function(e) {
+    // Håndter klik på edit-knappen (⋮)
+    if (e.target.classList.contains('edit-btn')) {
+      const gameId = e.target.dataset.id;
+      const rect = e.target.getBoundingClientRect();
+      showEditMenu(gameId, rect.left, rect.bottom);
+    }
+    // Håndter klik på platform-pill
+    else if (e.target.classList.contains('platform-pill')) {
+      const gameId = e.target.dataset.gameId;
+      const platformName = e.target.dataset.platformName;
+      const rect = e.target.getBoundingClientRect();
+      showPlatformTagMenu(gameId, platformName, rect.left, rect.bottom);
+    }
+    // Håndter klik på edit-menu knapper
+    else if (e.target.closest('.edit-menu')) {
+      const button = e.target;
+      const menu = button.closest('.edit-menu');
+      const gameId = button.dataset.id || menu.dataset.gameId;
+      
+      if (!appInstance) return;
+      
+      // Håndter forskellige typer af knapper
+      if (button.classList.contains('favorite-btn')) {
+        appInstance.toggleFavorite(gameId);
+        menu.remove();
+      }
+      else if (button.classList.contains('edit-date-btn')) {
+        const game = appInstance.games.find(g => g.id == gameId);
+        if (game) {
+          const currentDate = game.completionDate || '';
+          const newDate = prompt('Indtast gennemførelsesdato (DD-MM-ÅÅÅÅ):', currentDate);
+          if (newDate !== null) {
+            appInstance.setCompletionDate(gameId, newDate);
+          }
+        }
+        menu.remove();
+      }
+      else if (button.classList.contains('move-card-btn')) {
+        appInstance.toggleMoveMode(gameId);
+        menu.remove();
+      }
+      else if (button.classList.contains('today-date-btn')) {
+        appInstance.setTodayAsCompletionDate(gameId);
+        menu.remove();
+      }
+      else if (button.classList.contains('delete-btn')) {
+        if (confirm('Er du sikker på, at du vil slette dette spil?')) {
+          appInstance.deleteGame(gameId);
+        }
+        menu.remove();
+      }
+    }
+    // Håndter klik på platform-tag-menu knapper
+    else if (e.target.closest('.platform-tag-menu')) {
+      const button = e.target;
+      if (!button.classList.contains('change-platform-btn')) return;
+      
+      const menu = button.closest('.platform-tag-menu');
+      const gameId = button.dataset.id;
+      const newPlatformId = button.dataset.platformId;
+      
+      if (appInstance) {
+        appInstance.changePlatform(gameId, newPlatformId);
+      }
+      menu.remove();
+    }
+    // Luk menuer når der klikkes udenfor
+    else {
+      const activeMenus = document.querySelectorAll('.edit-menu, .platform-tag-menu');
+      if (activeMenus.length > 0) {
+        activeMenus.forEach(menu => {
+          // Undgå at lukke hvis vi klikkede på en knap, der åbner menuen
+          if (!e.target.classList.contains('edit-btn') && 
+              !e.target.classList.contains('platform-pill')) {
+            menu.remove();
+          }
+        });
+      }
+    }
+    
+    // Håndter klik på move arrows
+    if (appInstance && appInstance.isMoveModeActive) {
+      if (e.target.classList.contains('move-up') || e.target.classList.contains('move-down')) {
+        const direction = e.target.classList.contains('move-up') ? 'up' : 'down';
+        const targetCard = e.target.closest('.card');
+        const targetCardId = targetCard.dataset.id;
+        
+        if (appInstance.activeCardId) {
+          appInstance.moveCard(appInstance.activeCardId, targetCardId, direction);
+        }
+      }
+    }
+  });
 }
 
 function updateListIndicator(listIndicator, lists) {
@@ -251,6 +366,7 @@ function updateCardContent(cardElement, game) {
     platformPill.textContent = game.platform;
     platformPill.style.backgroundColor = game.platformColor;
     platformPill.dataset.platformName = game.platform;
+    platformPill.dataset.gameId = game.id;
   }
   
   // Opdater completion date
@@ -324,19 +440,27 @@ function updateIndicator() {
   });
 }
 
-export function showEditMenu(gameId, x, y, app) {
+// Opdateret showEditMenu med delegerede event listeners
+export function showEditMenu(gameId, x, y) {
   const existingMenu = document.querySelector(".edit-menu");
   if (existingMenu) {
     existingMenu.remove();
   }
 
-  const game = app.games.find((g) => g.id == gameId);
+  if (!appInstance || !appInstance.games) return;
+  
+  const game = appInstance.games.find((g) => g.id == gameId);
+  if (!game) return;
+  
   const menu = document.createElement("div");
   menu.className = "edit-menu";
   menu.style.position = "absolute";
+  menu.dataset.gameId = gameId;
 
   // Get the card element
   const card = document.querySelector(`.card[data-id="${gameId}"]`);
+  if (!card) return;
+  
   const cardRect = card.getBoundingClientRect();
 
   // Calculate position relative to the card
@@ -355,55 +479,10 @@ export function showEditMenu(gameId, x, y, app) {
 
   // Append the menu to the card instead of the body
   card.appendChild(menu);
-
-  addEditMenuListeners(menu, gameId, app);
 }
 
-function addEditMenuListeners(menu, gameId, app) {
-  menu.querySelector(".favorite-btn").addEventListener("click", () => {
-    app.toggleFavorite(gameId);
-    menu.remove();
-  });
-
-  menu.querySelector(".edit-date-btn").addEventListener("click", () => {
-    const game = app.games.find((g) => g.id == gameId);
-    const currentDate = game.completionDate || "";
-    const newDate = prompt(
-      "Indtast gennemførelsesdato (DD-MM-ÅÅÅÅ):",
-      currentDate
-    );
-    if (newDate !== null) {
-      app.setCompletionDate(gameId, newDate);
-    }
-    menu.remove();
-  });
-
-  menu.querySelector(".move-card-btn").addEventListener("click", () => {
-    app.toggleMoveMode(gameId);
-    menu.remove();
-  });
-
-  menu.querySelector(".today-date-btn").addEventListener("click", () => {
-    app.setTodayAsCompletionDate(gameId);
-    menu.remove();
-  });
-
-  menu.querySelector(".delete-btn").addEventListener("click", () => {
-    if (confirm("Er du sikker på, at du vil slette dette spil?")) {
-      app.deleteGame(gameId);
-    }
-    menu.remove();
-  });
-
-  document.addEventListener("click", function closeMenu(e) {
-    if (!menu.contains(e.target) && !e.target.classList.contains("edit-btn")) {
-      menu.remove();
-      document.removeEventListener("click", closeMenu);
-    }
-  });
-}
-
-export function showPlatformTagMenu(gameId, currentPlatform, x, y, app) {
+// Opdateret showPlatformTagMenu med delegerede event listeners
+export function showPlatformTagMenu(gameId, platformName, x, y) {
   const existingMenu = document.querySelector(".platform-tag-menu");
   if (existingMenu) {
     existingMenu.remove();
@@ -412,9 +491,12 @@ export function showPlatformTagMenu(gameId, currentPlatform, x, y, app) {
   const menu = document.createElement("div");
   menu.className = "platform-tag-menu";
   menu.style.position = "absolute";
+  menu.dataset.gameId = gameId;
 
   // Get the card element
   const card = document.querySelector(`.card[data-id="${gameId}"]`);
+  if (!card) return;
+  
   const cardRect = card.getBoundingClientRect();
 
   // Calculate position relative to the card
@@ -432,28 +514,6 @@ export function showPlatformTagMenu(gameId, currentPlatform, x, y, app) {
 
   // Append the menu to the card instead of the body
   card.appendChild(menu);
-
-  addPlatformTagMenuListeners(menu, gameId, currentPlatform, app);
-}
-
-function addPlatformTagMenuListeners(menu, gameId, currentPlatform, app) {
-  menu.querySelectorAll(".change-platform-btn").forEach((button) => {
-    button.addEventListener("click", () => {
-      const newPlatformId = button.dataset.platformId;
-      app.changePlatform(gameId, newPlatformId);
-      menu.remove();
-    });
-  });
-
-  document.addEventListener("click", function closeMenu(e) {
-    if (
-      !menu.contains(e.target) &&
-      !e.target.classList.contains("platform-pill")
-    ) {
-      menu.remove();
-      document.removeEventListener("click", closeMenu);
-    }
-  });
 }
 
 export function updatePlatformColors(platformName, newColor) {

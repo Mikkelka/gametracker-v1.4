@@ -4,51 +4,87 @@ import { updateGameOrder } from "../services/storage.js";
 
 let isDragging = false;
 let scrollInterval;
+let draggedElement = null;
+let appInstance = null;
 
 export function initDragAndDrop(app) {
-  document.addEventListener("dragstart", handleDragStart);
+  // Gem reference til app objektet
+  appInstance = app;
+  
+  // Brug event delegation for drag events
+  const listsContainer = document.getElementById("listsContainer");
+  
+  // Lyt efter events på containeren i stedet for på hvert element
+  listsContainer.addEventListener("dragstart", handleDragStart);
   document.addEventListener("dragend", handleDragEnd);
   document.addEventListener("dragover", handleDragOver);
   document.addEventListener("dragleave", handleDragLeave);
-  document.addEventListener("drop", (e) => handleDrop(e, app));
+  document.addEventListener("drop", handleDrop);
 
   // Tilføj autoscroll-zoner
+  setupAutoScrollZones();
+
+  // Opdateret scrolling håndtering
+  listsContainer.addEventListener("wheel", handleScroll, { passive: false });
+}
+
+function setupAutoScrollZones() {
   const body = document.body;
+  
+  // Fjern eksisterende zoner, hvis de findes
+  const existingZones = document.querySelectorAll('.autoscroll-zone');
+  existingZones.forEach(zone => zone.remove());
+  
+  // Opret nye zoner
   const topZone = document.createElement("div");
   topZone.className = "autoscroll-zone autoscroll-zone-top";
   const bottomZone = document.createElement("div");
   bottomZone.className = "autoscroll-zone autoscroll-zone-bottom";
+  
   body.appendChild(topZone);
   body.appendChild(bottomZone);
-
-  // Opdateret scrolling håndtering
-  const listsContainer = document.getElementById("listsContainer");
-  listsContainer.addEventListener("wheel", handleScroll, { passive: false });
 }
 
 function handleDragStart(e) {
-  if (e.target.classList.contains("card")) {
-    e.dataTransfer.setData("text/plain", e.target.dataset.id);
-    e.target.style.opacity = "0.5";
-    isDragging = true;
-    document
-      .querySelectorAll(".autoscroll-zone")
-      .forEach((zone) => zone.classList.add("active"));
-  }
+  // Find det nærmeste card element
+  const card = e.target.closest('.card');
+  if (!card) return;
+  
+  e.dataTransfer.setData("text/plain", card.dataset.id);
+  card.style.opacity = "0.5";
+  isDragging = true;
+  draggedElement = card;
+  
+  document
+    .querySelectorAll(".autoscroll-zone")
+    .forEach((zone) => zone.classList.add("active"));
 }
 
 function handleDragEnd(e) {
-  if (e.target.classList.contains("card")) {
-    e.target.style.opacity = "1";
+  // Brug event delegation - tjek om vi har et draget element
+  if (draggedElement) {
+    draggedElement.style.opacity = "1";
+    draggedElement = null;
     isDragging = false;
     deactivateScrollZones();
   }
 }
 
 function handleDragOver(e) {
+  if (!isDragging) return;
+  
   e.preventDefault();
   const draggedOverItem = e.target.closest(".card");
-  if (draggedOverItem && !draggedOverItem.classList.contains("dragging")) {
+  
+  // Reset borders på alle kort først
+  document.querySelectorAll('.card').forEach(card => {
+    if (card !== draggedOverItem) {
+      card.style.borderTop = "";
+      card.style.borderBottom = "";
+    }
+  });
+  
+  if (draggedOverItem && draggedOverItem !== draggedElement) {
     const bounding = draggedOverItem.getBoundingClientRect();
     const offset = bounding.y + bounding.height / 2;
     if (e.clientY - offset > 0) {
@@ -61,8 +97,14 @@ function handleDragOver(e) {
   }
 
   // Tjek for autoscroll
+  handleAutoScroll(e);
+}
+
+function handleAutoScroll(e) {
   const topZone = document.querySelector(".autoscroll-zone-top");
   const bottomZone = document.querySelector(".autoscroll-zone-bottom");
+
+  if (!topZone || !bottomZone) return;
 
   if (e.clientY < topZone.offsetHeight) {
     startScrolling("up");
@@ -94,7 +136,7 @@ function handleScroll(e) {
   if ((isAtBottom && e.deltaY > 0) || (isAtTop && e.deltaY < 0)) {
     const canScrollLeft = listsContainer.scrollLeft > 0;
     const canScrollRight =
-      listsContainer.scrollLeft <
+      listsContainer.scrollLeft 
       listsContainer.scrollWidth - listsContainer.clientWidth;
 
     if ((e.deltaY > 0 && canScrollRight) || (e.deltaY < 0 && canScrollLeft)) {
@@ -129,17 +171,28 @@ function deactivateScrollZones() {
   stopScrolling();
 }
 
-async function handleDrop(e, app) {
+async function handleDrop(e) {
+  if (!isDragging || !draggedElement) return;
+  
   e.preventDefault();
   const gameId = e.dataTransfer.getData("text");
-  const draggedElement = document.querySelector(`.card[data-id="${gameId}"]`);
+  
+  if (!gameId || !appInstance) return;
+  
   const dropTarget = e.target.closest(".card") || e.target.closest(".list");
 
   if (dropTarget) {
     const list = dropTarget.closest(".list");
-    const newStatus = app.lists.find(
-      (l) => l.name === list.querySelector("h2").textContent
-    ).id;
+    if (!list) return;
+    
+    const listTitle = list.querySelector("h2")?.textContent;
+    if (!listTitle) return;
+    
+    const newStatus = appInstance.lists.find(
+      (l) => l.name === listTitle
+    )?.id;
+    
+    if (!newStatus) return;
 
     if (dropTarget.classList.contains("card")) {
       const bounding = dropTarget.getBoundingClientRect();
@@ -158,7 +211,7 @@ async function handleDrop(e, app) {
       list.appendChild(draggedElement);
     }
 
-    await updateGameOrderAndStatus(list, app, newStatus);
+    await updateGameOrderAndStatus(list, newStatus);
 
     document.dispatchEvent(new CustomEvent("cardMoved"));
   }
@@ -171,14 +224,16 @@ async function handleDrop(e, app) {
   deactivateScrollZones();
 }
 
-async function updateGameOrderAndStatus(list, app, newStatus) {
+async function updateGameOrderAndStatus(list, newStatus) {
+  if (!appInstance) return;
+  
   const newOrder = Array.from(list.querySelectorAll(".card")).map(
     (card, index) => ({ id: card.dataset.id, order: index, status: newStatus })
   );
 
   let changedGames = [];
 
-  app.games = app.games.map((game) => {
+  appInstance.games = appInstance.games.map((game) => {
     const updatedGame = newOrder.find((item) => item.id === game.id);
     if (updatedGame) {
       if (
@@ -192,11 +247,11 @@ async function updateGameOrderAndStatus(list, app, newStatus) {
     return game;
   });
 
-  app.games.sort((a, b) => {
+  appInstance.games.sort((a, b) => {
     if (a.status !== b.status) {
       return (
-        app.lists.findIndex((list) => list.id === a.status) -
-        app.lists.findIndex((list) => list.id === b.status)
+        appInstance.lists.findIndex((list) => list.id === a.status) -
+        appInstance.lists.findIndex((list) => list.id === b.status)
       );
     }
     return a.order - b.order;
@@ -206,5 +261,5 @@ async function updateGameOrderAndStatus(list, app, newStatus) {
     await updateGameOrder(changedGames);
   }
 
-  render(app.games, app.lists);
+  render(appInstance.games, appInstance.lists, appInstance);
 }

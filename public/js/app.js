@@ -177,28 +177,60 @@ const App = {
   },
 
   toggleMoveMode(cardId) {
-    this.isMoveModeActive = !this.isMoveModeActive;
-    this.activeCardId = this.isMoveModeActive ? cardId : null;
+    // Slet altid eventuelle eksisterende cancel-knapper først
+    document.querySelectorAll('.cancel-move-btn').forEach(btn => btn.remove());
 
-    document.querySelectorAll(".card .move-arrows").forEach((arrows) => {
-      arrows.style.display = this.isMoveModeActive ? "flex" : "none";
+    // Hvis vi allerede er i move-mode og trykker på samme kort, så deaktiver move-mode
+    if (this.isMoveModeActive && this.activeCardId === cardId) {
+        this.isMoveModeActive = false;
+        this.activeCardId = null;
+    } else {
+        this.isMoveModeActive = true;
+        this.activeCardId = cardId;
+    }
+
+    // Opdateret håndtering af flyttilstand
+    document.querySelectorAll(".card").forEach((card) => {
+        const isActiveCard = card.dataset.id === this.activeCardId;
+        
+        // Fjern eller tilføj "active-card" klassen baseret på om kortet er aktivt
+        card.classList.toggle("active-card", isActiveCard && this.isMoveModeActive);
+        
+        // Vis kun pile på kort der IKKE er det aktive kort
+        const arrows = card.querySelector(".move-arrows");
+        if (arrows) {
+            arrows.style.display = this.isMoveModeActive && !isActiveCard ? "flex" : "none";
+        }
     });
 
-    if (this.isMoveModeActive) {
-      document.addEventListener("click", this.handleMoveArrowClick.bind(this));
+    // Tilføj "annuller" knap til det aktive kort
+    if (this.isMoveModeActive && this.activeCardId) {
+        const activeCard = document.querySelector(`.card[data-id="${this.activeCardId}"]`);
+        
+        // Opret en cancel-knap, hvis den ikke allerede eksisterer
+        if (activeCard && !activeCard.querySelector('.cancel-move-btn')) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'cancel-move-btn';
+            cancelBtn.innerHTML = 'Annuller';
+            cancelBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Forhindrer event bubbling
+                this.toggleMoveMode(this.activeCardId);
+            });
+            activeCard.appendChild(cancelBtn);
+        }
+        
+        document.addEventListener("click", this.handleMoveArrowClick.bind(this));
     } else {
-      document.removeEventListener(
-        "click",
-        this.handleMoveArrowClick.bind(this)
-      );
+        // Hvis vi ikke længere er i move-mode, fjern eventlistener
+        document.removeEventListener("click", this.handleMoveArrowClick.bind(this));
     }
 
     console.log(
-      `Move mode ${
-        this.isMoveModeActive ? "activated" : "deactivated"
-      } for card ${this.activeCardId}`
+        `Move mode ${
+            this.isMoveModeActive ? "activated" : "deactivated"
+        } for card ${this.activeCardId}`
     );
-  },
+},
 
   handleMoveArrowClick(event) {
     if (
@@ -230,18 +262,18 @@ const App = {
     console.log(
       `moveCard called with movedCardId: ${movedCardId}, targetCardId: ${targetCardId}, direction: ${direction}`
     );
-
+  
     const movedCardIndex = this.games.findIndex(
       (game) => game.id === movedCardId
     );
     const targetCardIndex = this.games.findIndex(
       (game) => game.id === targetCardId
     );
-
+  
     console.log(
       `movedCardIndex: ${movedCardIndex}, targetCardIndex: ${targetCardIndex}`
     );
-
+  
     if (movedCardIndex === -1 || targetCardIndex === -1) {
       console.error(
         `Kunne ikke finde et af kortene. movedCardId: ${movedCardId}, targetCardId: ${targetCardId}`
@@ -249,22 +281,22 @@ const App = {
       console.log("Current games:", this.games);
       return;
     }
-
+  
     const movedCard = this.games[movedCardIndex];
     const targetCard = this.games[targetCardIndex];
-
+  
     console.log(`Moving card: ${JSON.stringify(movedCard)}`);
     console.log(`Target card: ${JSON.stringify(targetCard)}`);
-
+  
     // Fjern det flyttede kort fra sin nuværende position
     this.games.splice(movedCardIndex, 1);
-
+  
     // Opdater status hvis kortet flyttes til en anden liste
     if (movedCard.status !== targetCard.status) {
       movedCard.status = targetCard.status;
       console.log(`Updated status of moved card to: ${movedCard.status}`);
     }
-
+  
     // Bestem den nye position
     let newIndex;
     if (direction === "up") {
@@ -278,18 +310,18 @@ const App = {
           ? targetCardIndex + 1
           : targetCardIndex;
     }
-
+  
     console.log(`New index for moved card: ${newIndex}`);
-
+  
     // Indsæt det flyttede kort på den nye position
     this.games.splice(newIndex, 0, movedCard);
-
+  
     // Opdater 'order' for alle kort i den relevante liste
     const statusGames = this.games.filter(
       (game) => game.status === movedCard.status
     );
     statusGames.sort((a, b) => this.games.indexOf(a) - this.games.indexOf(b));
-
+  
     let updatedGames = [];
     for (let i = 0; i < statusGames.length; i++) {
       if (statusGames[i].order !== i) {
@@ -297,9 +329,9 @@ const App = {
         updatedGames.push(statusGames[i]);
       }
     }
-
+  
     console.log(`Number of games to update: ${updatedGames.length}`);
-
+  
     // Gem kun de ændrede spil
     if (updatedGames.length > 0) {
       try {
@@ -309,12 +341,28 @@ const App = {
         console.error("Error saving updated games:", error);
       }
     }
-
+  
+    // Efter flytningen er gennemført, oprydning:
+    
+    // 1. Fjern alle cancel-knapper
+    document.querySelectorAll('.cancel-move-btn').forEach(btn => btn.remove());
+    
+    // 2. Skjul alle pile
+    document.querySelectorAll(".move-arrows").forEach(arrows => {
+      arrows.style.display = "none";
+    });
+    
+    // 3. Fjern active-card klassen fra alle kort
+    document.querySelectorAll(".card").forEach(card => {
+      card.classList.remove("active-card");
+    });
+    
+    // 4. Nulstil move-mode tilstanden
+    this.isMoveModeActive = false;
+    this.activeCardId = null;
+  
     render(this.games, this.lists);
     debouncedSync();
-
-    // Deaktiver move-tilstand efter flytning
-    this.toggleMoveMode(null);
   },
 
   showSyncPopup() {

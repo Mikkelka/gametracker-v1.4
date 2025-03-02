@@ -4,139 +4,159 @@ import { exportGames, importGames } from "../utils/importExport.js";
 import { showEditMenu, showPlatformTagMenu } from "./ui.js";
 import { Settings } from "./settings.js";
 
+// Gemmer app reference
+let appInstance = null;
+
 export function initUIHandlers(app) {
-  const addGameBtn = document.getElementById("addGameBtn");
-  const addGameModal = document.getElementById("addGameModal");
-  const platformBtn = document.getElementById("platformBtn");
-  const platformModal = document.getElementById("platformModal");
-  const closeButtons = document.querySelectorAll(".close");
-  const addGameForm = document.getElementById("addGameForm");
-  const exportBtn = document.getElementById("exportBtn");
-  const importBtn = document.getElementById("importBtn");
-  const importFile = document.getElementById("importFile");
-  const editNameBtn = document.getElementById("editNameBtn");
-  const editNameModal = document.getElementById("editNameModal");
-  const editNameForm = document.getElementById("editNameForm");
-  const dropdownBtn = document.getElementById("dropdownBtn");
-  const dropdownContent = document.getElementById("dropdownContent");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const settingsBtn = document.getElementById("settingsBtn");
-  const settingsModal = document.getElementById("settingsModal");
+  // Gem app referencen
+  appInstance = app;
+  
+  // Cache DOM-elementer
+  const modals = {
+    addGame: document.getElementById("addGameModal"),
+    platform: document.getElementById("platformModal"),
+    editName: document.getElementById("editNameModal"),
+    settings: document.getElementById("settingsModal")
+  };
+  
+  const buttons = {
+    addGame: document.getElementById("addGameBtn"),
+    platform: document.getElementById("platformBtn"),
+    export: document.getElementById("exportBtn"),
+    import: document.getElementById("importBtn"),
+    importFile: document.getElementById("importFile"),
+    editName: document.getElementById("editNameBtn"),
+    dropdown: document.getElementById("dropdownBtn"),
+    dropdownContent: document.getElementById("dropdownContent"),
+    logout: document.getElementById("logoutBtn"),
+    settings: document.getElementById("settingsBtn"),
+    closeButtons: document.querySelectorAll(".close")
+  };
+  
+  const forms = {
+    addGame: document.getElementById("addGameForm"),
+    editName: document.getElementById("editNameForm")
+  };
 
-  const modals = [addGameModal, platformModal, editNameModal, settingsModal];
-
+  // Fælles modalfunktioner
   function closeAllModals() {
-    modals.forEach((modal) => {
-      modal.style.display = "none";
+    Object.values(modals).forEach(modal => {
+      if (modal) modal.style.display = "none";
     });
   }
 
   function toggleModal(modalToToggle) {
+    if (!modalToToggle) return;
+    
     if (modalToToggle.style.display === "block") {
       modalToToggle.style.display = "none";
     } else {
       closeAllModals();
       modalToToggle.style.display = "block";
+      
+      // Specialhåndtering for forskellige modals
+      if (modalToToggle === modals.addGame) {
+        const platformSelect = document.getElementById("gamePlatform");
+        if (platformSelect) platformSelect.innerHTML = Platforms.getPlatformSelectOptions();
+      } else if (modalToToggle === modals.platform) {
+        Platforms.renderPlatformList();
+      } else if (modalToToggle === modals.editName) {
+        document.getElementById("newName").value = appInstance.userDisplayName || "";
+      } else if (modalToToggle === modals.settings) {
+        Settings.updateSettingsForm();
+      }
     }
   }
 
-  addGameBtn.addEventListener("click", () => {
-    toggleModal(addGameModal);
-    const platformSelect = document.getElementById("gamePlatform");
-    platformSelect.innerHTML = Platforms.getPlatformSelectOptions();
+  // Tilføj global event delegation på document
+  document.addEventListener("click", async (e) => {
+    // Håndter modale knapper
+    if (e.target === buttons.addGame) {
+      toggleModal(modals.addGame);
+    } 
+    else if (e.target === buttons.platform) {
+      toggleModal(modals.platform);
+    }
+    else if (e.target === buttons.export) {
+      await exportGames();
+    }
+    else if (e.target === buttons.import) {
+      buttons.importFile.click();
+    }
+    else if (e.target === buttons.editName) {
+      toggleModal(modals.editName);
+    }
+    else if (e.target === buttons.dropdown) {
+      buttons.dropdownContent.classList.toggle("show");
+    }
+    else if (e.target === buttons.logout) {
+      await logout();
+    }
+    else if (e.target === buttons.settings) {
+      toggleModal(modals.settings);
+    }
+    // Håndter luk-knapper
+    else if (e.target.classList.contains("close")) {
+      const modal = e.target.closest(".modal");
+      if (modal) modal.style.display = "none";
+    }
+    // Håndter klik på modal baggrund
+    else if (e.target.classList.contains("modal")) {
+      e.target.style.display = "none";
+    }
+    // Håndter dropdown lukning ved klik udenfor
+    else if (!e.target.matches(".dropbtn")) {
+      buttons.dropdownContent.classList.remove("show");
+    }
   });
 
-  platformBtn.addEventListener("click", () => {
-    toggleModal(platformModal);
-    Platforms.renderPlatformList();
-  });
-
-  closeButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      button.closest(".modal").style.display = "none";
+  // Formhåndtering
+  if (forms.addGame) {
+    forms.addGame.addEventListener("submit", handleAddGameSubmit);
+  }
+  
+  if (forms.editName) {
+    forms.editName.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const newName = document.getElementById("newName").value;
+      if (appInstance && typeof appInstance.updateUserName === 'function') {
+        await appInstance.updateUserName(newName);
+        modals.editName.style.display = "none";
+      }
     });
-  });
+  }
 
-  window.addEventListener("click", (event) => {
-    if (event.target.classList.contains("modal")) {
-      event.target.style.display = "none";
-    }
-    if (!event.target.matches(".dropbtn")) {
-      dropdownContent.classList.remove("show");
-    }
-  });
-
-  addGameForm.addEventListener("submit", handleAddGameSubmit);
-
-  document.addEventListener("click", handleClick);
-
-  exportBtn.addEventListener("click", exportGames);
-
-  importBtn.addEventListener("click", () => {
-    importFile.click();
-  });
-
-  importFile.addEventListener("change", async (e) => {
-    if (e.target.files.length > 0) {
-      await importGames(e.target.files[0]);
-    }
-  });
-
-  editNameBtn.addEventListener("click", () => {
-    toggleModal(editNameModal);
-    document.getElementById("newName").value = app.userDisplayName;
-  });
-
-  editNameForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const newName = document.getElementById("newName").value;
-    await app.updateUserName(newName);
-    editNameModal.style.display = "none";
-  });
-
-  dropdownBtn.addEventListener("click", () => {
-    dropdownContent.classList.toggle("show");
-  });
-
-  logoutBtn.addEventListener("click", () => logout(app));
+  // Import file change event
+  if (buttons.importFile) {
+    buttons.importFile.addEventListener("change", async (e) => {
+      if (e.target.files.length > 0) {
+        await importGames(e.target.files[0]);
+      }
+    });
+  }
 
   function handleAddGameSubmit(e) {
     e.preventDefault();
     const title = document.getElementById("gameTitle").value;
     const platformId = document.getElementById("gamePlatform").value;
-    if (title && platformId) {
-      app.addGame(title, platformId);
-      addGameModal.style.display = "none";
+    
+    if (title && platformId && appInstance && typeof appInstance.addGame === 'function') {
+      appInstance.addGame(title, platformId);
+      modals.addGame.style.display = "none";
       e.target.reset();
     }
   }
-
-  function handleClick(e) {
-    if (e.target.classList.contains("edit-btn")) {
-      const gameId = e.target.dataset.id;
-      const rect = e.target.getBoundingClientRect();
-      showEditMenu(gameId, rect.left, rect.bottom, app);
-    } else if (e.target.classList.contains("platform-pill")) {
-      const gameId = e.target.dataset.gameId;
-      const platformName = e.target.dataset.platformName;
-      const rect = e.target.getBoundingClientRect();
-      showPlatformTagMenu(gameId, platformName, rect.left, rect.bottom, app);
-    }
-  }
-
-  settingsBtn.addEventListener("click", () => {
-    toggleModal(settingsModal);
-    Settings.updateSettingsForm();
-  });
 
   // Initialiser indstillinger
   Settings.init();
 }
 
-async function logout(app) {
+async function logout() {
+  if (!appInstance) return;
+  
   try {
-    if (typeof app.syncWithFirebase === "function") {
-      await app.syncWithFirebase();
+    if (typeof appInstance.syncWithFirebase === "function") {
+      await appInstance.syncWithFirebase();
     }
     await window.auth.signOut();
     window.location.href = "login.html";

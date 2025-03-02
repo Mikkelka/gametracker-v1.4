@@ -87,41 +87,64 @@ export const Platforms = {
     const addPlatformForm = document.getElementById("addPlatformForm");
     const colorInput = document.getElementById("platformColor");
     const colorPreview = document.querySelector(".color-preview");
+    const platformList = document.getElementById("platformList");
 
-    colorInput.addEventListener("input", (e) => {
+    // Fjern eksisterende event listeners før tilføjelse af nye
+    colorInput.removeEventListener("input", this._handleColorInput);
+    colorPreview.removeEventListener("click", this._handleColorPreviewClick);
+    addPlatformForm.removeEventListener("submit", this._handleFormSubmit);
+    platformList.removeEventListener("click", this._handlePlatformListClick);
+    platformList.removeEventListener("change", this._handlePlatformListChange);
+
+    // Gem referencer til event handler funktioner, så vi kan fjerne dem senere
+    this._handleColorInput = (e) => {
       colorPreview.style.backgroundColor = e.target.value;
-    });
+    };
 
-    colorPreview.addEventListener("click", () => {
+    this._handleColorPreviewClick = () => {
       colorInput.click();
-    });
+    };
 
-    addPlatformForm.addEventListener("submit", (e) => {
+    this._handleFormSubmit = (e) => {
       e.preventDefault();
       const name = document.getElementById("platformName").value;
       const color = colorInput.value;
       this.addPlatform(name, color);
       e.target.reset();
       colorPreview.style.backgroundColor = "";
-    });
+    };
 
-    document.getElementById("platformList").addEventListener("click", (e) => {
+    // Event delegation for platformList
+    this._handlePlatformListClick = (e) => {
+      // Håndter delete knapper
       if (e.target.classList.contains("delete-platform")) {
         const id = e.target.dataset.id;
         this.deletePlatform(id);
-      } else if (e.target.classList.contains("color-picker-wrapper")) {
+      } 
+      // Håndter color-picker-wrapper
+      else if (e.target.classList.contains("color-picker-wrapper")) {
         const colorPicker = e.target.querySelector(".color-picker");
-        colorPicker.click();
+        if (colorPicker) {
+          colorPicker.click();
+        }
       }
-    });
+    };
 
-    document.getElementById("platformList").addEventListener("change", (e) => {
+    // Event delegation for farveændringer
+    this._handlePlatformListChange = (e) => {
       if (e.target.classList.contains("color-picker")) {
         const id = e.target.dataset.id;
         const newColor = e.target.value;
         this.updatePlatformColor(id, newColor);
       }
-    });
+    };
+
+    // Tilføj event listeners
+    colorInput.addEventListener("input", this._handleColorInput);
+    colorPreview.addEventListener("click", this._handleColorPreviewClick);
+    addPlatformForm.addEventListener("submit", this._handleFormSubmit);
+    platformList.addEventListener("click", this._handlePlatformListClick);
+    platformList.addEventListener("change", this._handlePlatformListChange);
   },
 
   getPlatformSelectOptions() {

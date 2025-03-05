@@ -150,7 +150,6 @@ export async function updateGameOrder(changedGames) {
   });
 
   hasUnsyncedChanges = true;
-
   debouncedSync();
 }
 
@@ -184,14 +183,24 @@ export async function syncWithFirebase() {
   console.log(
     `Starting synchronization. Total operations to sync: ${batchOperations.length}`
   );
+  
+  // Sorter operationer, så delete kommer sidst (undgår afhængighedsproblemer)
+  batchOperations.sort((a, b) => {
+    if (a.type === "delete" && b.type !== "delete") return 1;
+    if (a.type !== "delete" && b.type === "delete") return -1;
+    return 0;
+  });
+
+  // Opdel operationer i batches
+  const MAX_RETRIES = 3;
+  let retryCount = 0;
+  let failedOperations = [];
 
   while (batchOperations.length > 0) {
     const batch = window.db.batch();
     const currentBatch = batchOperations.splice(0, BATCH_LIMIT);
 
-    let setOps = 0,
-      updateOps = 0,
-      deleteOps = 0;
+    let setOps = 0, updateOps = 0, deleteOps = 0;
 
     currentBatch.forEach((operation) => {
       switch (operation.type) {
@@ -210,31 +219,76 @@ export async function syncWithFirebase() {
       }
     });
 
-    console.log(
-      `Batch breakdown: Set: ${setOps}, Update: ${updateOps}, Delete: ${deleteOps}`
-    );
+    console.log(`Batch breakdown: Set: ${setOps}, Update: ${updateOps}, Delete: ${deleteOps}`);
 
     try {
       await batch.commit();
+      updateSyncStatus(`Synced: ${setOps + updateOps + deleteOps} operations`);
     } catch (error) {
       console.error(`Error committing batch:`, error);
+      
+      // Gem fejlede operationer til retry
+      failedOperations = [...failedOperations, ...currentBatch];
+      
+      // Tjek om vi skal forsøge igen
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        updateSyncStatus(`Retry ${retryCount}/${MAX_RETRIES}...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Eksponentiel backoff
+      }
     }
   }
 
-  hasUnsyncedChanges = false;
-  console.log("Synchronization completed");
+  // Håndter fejlede operationer
+  if (failedOperations.length > 0) {
+    console.warn(`${failedOperations.length} operations failed after ${MAX_RETRIES} retries`);
+    // Gem fejlede operationer til senere forsøg
+    batchOperations = [...batchOperations, ...failedOperations];
+    updateSyncStatus(`${failedOperations.length} changes pending`, true);
+  } else {
+    hasUnsyncedChanges = false;
+    updateSyncStatus('All changes synced');
+    console.log("Synchronization completed successfully");
+  }
 
-  // Reload and repair games after sync
+  // Reload og reparer spil efter synkronisering
   await loadGames();
   console.log("Games reloaded and repaired after sync");
 
-  showSyncPopup();
+  showSyncPopup(failedOperations.length === 0);
 }
 
-function showSyncPopup() {
+// Ny hjælpefunktion til at opdatere synkroniseringsstatus
+function updateSyncStatus(message, isError = false) {
+  const syncPopup = document.getElementById("syncPopup");
+  if (syncPopup) {
+    const syncText = syncPopup.querySelector('.sync-text');
+    if (syncText) syncText.textContent = message;
+    
+    if (isError) {
+      syncPopup.classList.add('sync-error');
+    } else {
+      syncPopup.classList.remove('sync-error');
+    }
+  }
+}
+
+function showSyncPopup(success = true) {
   const popup = document.getElementById("syncPopup");
   if (popup) {
+    // Fjern eventuelle eksisterende klasser
+    popup.classList.remove('sync-error', 'show');
+    
+    // Tilføj klasser baseret på status
+    if (!success) popup.classList.add('sync-error');
     popup.classList.add("show");
+    
+    // Opdater ikon baseret på status
+    const syncIcon = popup.querySelector('.sync-icon');
+    if (syncIcon) {
+      syncIcon.textContent = success ? "✓" : "⚠️";
+    }
+    
     setTimeout(() => {
       popup.classList.remove("show");
     }, 3000); // Popup disappears after 3 seconds
